@@ -23,7 +23,7 @@ class PgHelper {
    *
    * @throws Error object if an error occurs
    */
-  async getClient() {
+  async getConnection() {
     try {
       const client = await this.pool.connect();
       if (this.poolError) {
@@ -31,7 +31,7 @@ class PgHelper {
       }
       return client;
     } catch (err) {
-      throw new Error(`DB Connect Error: ${err.message}`);
+      throw new Error(`Connect: ${err.message}`);
     }
   }
 
@@ -42,7 +42,7 @@ class PgHelper {
    *
    * @throws Error object when an error occurs
    */
-  async releaseClient(c) {
+  async releaseConnection(c) {
     try {
       if (c) {
         await c.release();
@@ -51,7 +51,23 @@ class PgHelper {
         throw new Error(this.poolError.message);
       }
     } catch (err) {
-      throw new Error(`DB Disconnect Error: ${err.message}`);
+      throw new Error(`Disconnect: ${err.message}`);
+    }
+  }
+
+  async close() {
+    try {
+      if (this.pool) {
+        await this.pool.end;
+      }
+      if (this.poolError) {
+        throw new Error(this.poolError.message);
+      }
+    } catch (err) {
+      throw new Error(`Close: ${err.message}`);
+    } finally {
+      this.pool = undefined;
+      this.poolError = null;
     }
   }
 }
