@@ -55,6 +55,14 @@ class PgHelper {
     }
   }
 
+  /**
+   * @async
+   *
+   * Close down the connection pool. After calling this method, the object can no longer be used
+   * and should be disposed. A new object will need to be created for further database operations.
+   *
+   * @throws Error if there is an error when freeing up the pool
+   */
   async close() {
     try {
       if (this.pool) {
