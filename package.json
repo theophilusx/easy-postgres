@@ -1,0 +1,36 @@
+{
+  "name": "pg-helper",
+  "version": "1.0.0",
+  "description": "Simple abstraction for working with PostgeSQL database",
+  "main": "src/index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/theophilusx/pg-helper.git"
+  },
+  "keywords": [
+    "database",
+    "Postgres"
+  ],
+  "author": "Tim Cross",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/theophilusx/pg-helper/issues"
+  },
+  "homepage": "https://github.com/theophilusx/pg-helper#readme",
+  "dependencies": {
+    "pg": "^8.5.1",
+    "pg-copy-streams": "^5.1.1"
+  },
+  "devDependencies": {
+    "chai": "^4.3.0",
+    "chai-as-promised": "^7.1.1",
+    "dotenv": "^8.2.0",
+    "mocha": "^8.3.0"
+  }
+}
