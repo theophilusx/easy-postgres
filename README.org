@@ -51,7 +51,7 @@
 
     Then in your code you could have something like;
 
-    #+begin_src js2
+    #+begin_src js
       "use strict";
 
       const dotenvPath = __dirname + "/../.env";
@@ -67,7 +67,7 @@
     However, if you prefer to not use =dotenv= or environment variables, you can
     just pass in the =config= object e.g.
 
-    #+begin_src js2
+    #+begin_src js
       "use strict";
 
       const PgHelper = require("pg-helper");
@@ -104,7 +104,7 @@
     =getConnection()=, you need to release it back to the pool once your
     finished using it.
 
-    con :: a conneciton object obtained from a call to getConnection().
+    - con :: a conneciton object obtained from a call to getConnection().
 
 *** close()
 
@@ -125,9 +125,15 @@
     argument is supplied, the method will request a connection from the
     connection pool.
 
+    - stmt :: String. The SQL statement to executes
+    - params :: (Optional) Array. Parameter values to be substituted for $1, $2, ... $n
+      placeholders in the SQL statement.
+    - con :: (Optional) Object. A connection object returned from a call to
+      =getConnection()=
+
     Examples
 
-    #+begin_src js2
+    #+begin_src js
       "use strict";
 
       const dotenvPath = __dirname + "/../.env";

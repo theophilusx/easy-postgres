@@ -42,7 +42,7 @@ PGAPPNAME='cool-app'
 
 Then in your code you could have something like;
 
-```js2
+```js
 "use strict";
 
 const dotenvPath = __dirname + "/../.env";
@@ -57,7 +57,7 @@ let rslt = db.execSQL("SELECT * FROM my_table");
 
 However, if you prefer to not use `dotenv` or environment variables, you can just pass in the `config` object e.g.
 
-```js2
+```js
 "use strict";
 
 const PgHelper = require("pg-helper");
@@ -83,7 +83,7 @@ The `getconnection()` method returns a database connection from the connection p
 
 The `releaseConnection(con)` method is used to release the conneciton `con` back to the connection pool. After obtaining a connection with a call to `getConnection()`, you need to release it back to the pool once your finished using it.
 
-con :: a conneciton object obtained from a call to getConnection().
+-   **con:** a conneciton object obtained from a call to getConnection().
 
 ### close()<a id="sec-1-3-4"></a>
 
@@ -93,9 +93,13 @@ The `close()` method signals that your finished interacting with the database an
 
 The `execSQL(stmt, params, con)` method executes the statement defined in the `stmt` argument. The argument is a string. Statements can contain parameter placeholders using `$1, $2, ... $n`. When placeholder arguments are used, the optional `params` argument contains the values for the placeholders as an array of values. The optional `con` argument is a connection object returned from a call to `getConnection()`. If no `con` argument is supplied, the method will request a connection from the connection pool.
 
+-   **stmt:** String. The SQL statement to executes
+-   **params:** (Optional) Array. Parameter values to be substituted for $1, $2, &#x2026; $n placeholders in the SQL statement.
+-   **con:** (Optional) Object. A connection object returned from a call to `getConnection()`
+
 Examples
 
-```js2
+```js
 "use strict";
 
 const dotenvPath = __dirname + "/../.env";
