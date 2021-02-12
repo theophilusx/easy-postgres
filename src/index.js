@@ -11,6 +11,7 @@ class PgHelper {
     } else {
       this.pool = new Pool();
     }
+    this.doRelease = false;
     this.pool.on("error", (err) => {
       this.poolError = err;
     });
@@ -76,6 +77,48 @@ class PgHelper {
     } finally {
       this.pool = undefined;
       this.poolError = null;
+    }
+  }
+
+  /**
+   * @async
+   *
+   * Execute an SQL statement, possibly using optional parameters and return the
+   * result object. An optional connection object can be passed in, which will be used
+   * instead of getting a fresh connection from the pool.
+   *
+   * @param {String} stmt - an SQL statement to execute
+   * @param {Array} params - (Optional) An array of parameters to be used
+   * @param {Object} con - (Optional) A connection object to use
+   *
+   * @throws {Error} if an error occurs.
+   */
+  async execSQL(stmt, params = [], con) {
+    let rslt;
+
+    try {
+      if (!con) {
+        con = await this.getConnection();
+        this.doRelease = true;
+      }
+      if (params.length) {
+        rslt = await con.query(stmt, params);
+      } else {
+        rslt = await con.query(stmt, params);
+      }
+      if (this.poolError) {
+        let e = new Error(this.poolError.message);
+        this.poolError = null;
+        throw e;
+      }
+      return rslt;
+    } catch (err) {
+      throw new Error(`execSQL: ${err.message} Statement: ${stmt}`);
+    } finally {
+      if (this.doRelease) {
+        await this.releaseConnection(con);
+        this.doRelease = false;
+      }
     }
   }
 }
