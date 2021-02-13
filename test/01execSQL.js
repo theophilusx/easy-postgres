@@ -131,7 +131,6 @@ describe("Execute statement tests", function () {
       let stmt = "SELECT * FROM pghelper.test1 WHERE name = $1";
       let params = [["val1"], ["val2"], ["val3"]];
       let rslt = await db.execTransactionSQL(stmt, params);
-      console.dir(rslt);
       expect(rslt.rowCount).to.equal(3);
       return expect(rslt.rows.length).to.equal(3);
     });
@@ -145,7 +144,6 @@ describe("Execute statement tests", function () {
         ["val3", "value3"],
       ];
       let rslt = await db.execTransactionSQL(stmt, params);
-      console.dir(rslt);
       expect(rslt.rowCount).to.equal(3);
       return expect(rslt.rows.length).to.equal(3);
     });

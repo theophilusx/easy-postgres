@@ -18,30 +18,34 @@ const doCopyTo = (stmt, stringifyFn, data, con) => {
     let stream, rs;
     let idx = 0;
 
-    rs = new Readable({
-      encoding: "utf8",
-      read() {
-        if (idx === data.length) {
-          this.push(null);
-        } else {
-          let r = records[idx];
-          this.push(stringifyFn(r));
-          idx += 1;
-        }
-      },
-    });
+    try {
+      rs = new Readable({
+        encoding: "utf8",
+        read() {
+          if (idx === data.length) {
+            this.push(null);
+          } else {
+            let r = data[idx];
+            this.push(stringifyFn(r));
+            idx += 1;
+          }
+        },
+      });
 
-    rs.on("error", (err) => {
+      rs.on("error", (err) => {
+        reject(err.message);
+      });
+      stream = con.query(copyFrom(stmt));
+      stream.on("error", (err) => {
+        reject(err.message);
+      });
+      stream.on("finish", () => {
+        resolve({ rowCount: data.length });
+      });
+      rs.pipe(stream);
+    } catch (err) {
       reject(err.message);
-    });
-    stream = con.query(copyFrom(stmt));
-    stream.on("error", (err) => {
-      reject(err.message);
-    });
-    stream.on("finish", () => {
-      resolve({ rowCount: data.length });
-    });
-    rs.pipe(stream);
+    }
   });
 };
 
@@ -272,7 +276,7 @@ class PgHelper {
       throw new Error(`copyInsert: ${err.message}`);
     } finally {
       if (this.doRelease) {
-        await this.releaseClient(con);
+        await this.releaseConnection(con);
         this.doRelease = false;
       }
     }
