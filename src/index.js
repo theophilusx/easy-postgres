@@ -2,6 +2,7 @@
 
 const { Client, Pool } = require("pg");
 const copyFrom = require("pg-copy-streams").from;
+const Readable = require("stream").Readable;
 
 const mkResult = (rslt, accRslt) => {
   if (!accRslt) {
@@ -10,6 +11,38 @@ const mkResult = (rslt, accRslt) => {
   accRslt.rowCount += rslt.rowCount;
   accRslt.rows = [...accRslt.rows, ...rslt.rows];
   return accRslt;
+};
+
+const doCopyTo = (stmt, stringifyFn, data, con) => {
+  return new Promise((resolve, reject) => {
+    let stream, rs;
+    let idx = 0;
+
+    rs = new Readable({
+      encoding: "utf8",
+      read() {
+        if (idx === data.length) {
+          this.push(null);
+        } else {
+          let r = records[idx];
+          this.push(stringifyFn(r));
+          idx += 1;
+        }
+      },
+    });
+
+    rs.on("error", (err) => {
+      reject(err.message);
+    });
+    stream = con.query(copyFrom(stmt));
+    stream.on("error", (err) => {
+      reject(err.message);
+    });
+    stream.on("finish", () => {
+      resolve({ rowCount: data.length });
+    });
+    rs.pipe(stream);
+  });
 };
 
 class PgHelper {
@@ -199,6 +232,48 @@ class PgHelper {
         throw new Error(
           `execTransactionSQL: Error releasing connection: ${err.message}`
         );
+      }
+    }
+  }
+
+  /**
+   * @async
+   *
+   * Use the Postgres \copy command to insert an array of records into the database. For large data
+   * sets, this can be much faster than normal SQL insert commands. The stmt argument is a string containing
+   * the SQL statement e.g. COPY my_table (col1, col2, col3) FROM STDIN WITH DELIMITER '\t' CSV QUOTE ''
+   * (See the Postgres manual for details). The stringifyFN is a function which takes 1 argument, a record to
+   * insert and returns a string representation of that record which matches the format set in the SQL stmt argument.
+   * The data argument is an array of records. The optional con argument is a connection object returned from a call
+   * to getConnection(). If not supplied, the method will obtain a connection from the pool and return it on completion
+   *
+   * @param {String} stmt - An SQL COPY statement
+   * @param {Function} stringifyFn - A function of 1 argument which returns a string
+   *                   representation of a record
+   * @param {Array} data - an array of data records to be inserted
+   * @param {Object} con - a connection objec
+   *
+   * @throws {Error} when an error is raised.
+   */
+  async copyInsert(stmt, stringifyFn, data, con) {
+    try {
+      if (!con) {
+        con = await this.getConnection();
+        this.doRelease = true;
+      }
+      let rslt = await doCopyTo(stmt, stringifyFn, data, con);
+      if (this.poolError) {
+        let e = new Error(this.poolError.message);
+        this.poolError = null;
+        throw e;
+      }
+      return rslt;
+    } catch (err) {
+      throw new Error(`copyInsert: ${err.message}`);
+    } finally {
+      if (this.doRelease) {
+        await this.releaseClient(con);
+        this.doRelease = false;
       }
     }
   }
