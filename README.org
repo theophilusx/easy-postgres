@@ -210,6 +210,53 @@
         });
     #+end_src
 
+*** copyInsert(stmt, stringifyFn, data, con)
+
+    The =copyInsert(stmt, stringifyFn, data, con)= method uses the Postgres COPY
+    command to insert records into a database table. For large record sets, this
+    can be much faster than using standard SQL INSERT commands. The COPY
+    statement format must comply with Postres COPY command (see Postgres
+    documentation for details) For example
+
+    #+begin_src sql
+      COPY my_table (col1, col2, col3, col4)
+      FROM STDIN WITH DELIMITER '\t' CSV QUOTE ''''
+    #+end_src
+
+    The above statement essentially says that the COPY command will expect
+    records in a CSV format where fields are separated by a tab character with
+    single quotes used for fields requiring quoting (like strings or dates). The stringifyFn will accept a record in whatever format you
+    require and convert it into a string with values, like strings, quoted with
+    single quotes and fields separated by a tab. The string should end with a
+    newline character. Some values will need conversion to formats which
+    Postgres will understand e.g. date strings or JSON data etc. This can be a
+    little tricky to work out. Sometimes, it can be useful to write the data to
+    a file in what you think is the correct format and then use psql to try
+    inserting it into the database. This will sometimes provide error messages
+    which are more meaningful and can be easier for experimentation.
+
+    The =data= argument is an array of records. The records can be in any format
+    e.g. objects, arrays of data etc. All that is necessary is that the
+    =stringifyFn= function is able to understand the format and generate the
+    necessary string representation.
+
+    The =con= argument is a connection object returned by a call to
+    =getConnection()=. If it is not supplied, the method will request a new
+    connection from the connection pool and release it once the statement
+    execution has completed.
+
+    The method returns a result set object with only one property, =rowCount=,
+    the number of records inserted by the copy command. Note that the COPY
+    command is an all or nothing command. The command is executed inside a
+    transaction and if any errors occur, all inserts are rolled back.
+
+    - stmt :: String. A Postgres COPY statement.
+    - stringifyFn :: Function. A function of one argument which accepts a record
+      and returns a suitable string representation for insertion using the COPY
+      command.
+    - data :: Array. An array of data records to be inserted into the database
+    - con :: Object. A connection object as returned from a call to =getConnection()=.
+
 ** Bug Reports & Issues
 
    Please report bugs via the issues page on github at
