@@ -161,6 +161,55 @@
       run();
     #+end_src
 
+*** execTransactionSQL(stmt, params, con)
+
+    Similar to =execSQL()=, except the statement is executed inside a
+    transaction block. If all executions of the statement succeed, the block is
+    committed. If there are any errors, the block is rolled back.
+
+    The =stmt= argument is a string specifying an SQL command, usually with
+    placeholder parameters (e.g. $1, $2, ... $n). The =params= argument is an
+    array of array elements where each sub-array is a list of values to be used
+    as values in the placeholder parameters. The =con= argument is an optional
+    connection object, as returned from a call to =getconnection()=. If no =con=
+    value is supplied, the method will request a new connection from the
+    connection pool and release it back to the pool on completion.
+
+    The result set returned by the method is an accumulated result set where the
+    =rowCount= property is the total rows affected by the transaction and the
+    =rows= value is the accumulated rows returned by each statement execution.
+
+    - stmt :: String. The SQL statement to execute, possibly including $1 ... $n
+      placeholder arguments.
+    - params :: (Optional) Array. An array of arrays where each sub-array
+      contains the values to be used to replace placeholder parameters.
+    - con :: (Optional) Object. A connection object returned from a call to
+      =getConnection=.
+
+    Example
+
+    #+begin_src js
+      "use strict";
+
+      const dotenvPath = __dirname + "/../.env";
+      require("dotenv").config({ path: dotenvPath });
+
+      const PgHelper = require("pg-helper");
+
+      const db = new PgHelper();
+
+      const stmt = "UPDATE my_table SET col1 = $1 WHERE col2 = $2";
+      const params = [["val1", 20], ["val2", 30], ["val3", 40]];
+
+      db.execTransactionSQL(stmt, params)
+        .then(rslt => {
+          console.log(`${rslt.rowCount} rows updated`);
+        })
+        .catch(err => {
+          console.log(err.message);
+        });
+    #+end_src
+
 ** Bug Reports & Issues
 
    Please report bugs via the issues page on github at
