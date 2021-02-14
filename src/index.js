@@ -281,6 +281,14 @@ class PgHelper {
       }
     }
   }
+
+  poolStatus() {
+    return {
+      clientCount: this.pool.totalCount,
+      idleCount: this.pool.idleCount,
+      waitingCount: this.pool.waitingCount,
+    };
+  }
 }
 
 module.exports = PgHelper;
