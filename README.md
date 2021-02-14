@@ -24,7 +24,15 @@ The library is by no means complete. It currently meets all my own use cases, bu
 
 This module is really just a wrapper around the `pg` and `pg-copy-streams` modules from NPM. Therefore, refer to the documentation for these modules for additional information on things like the structure of result sets returned from queries etc.
 
+The current version is v1.0.0. It has been tested against PostgrSQL v12 using node v12.20.0.
+
 ## Installation<a id="sec-1-1"></a>
+
+To install the module, just do
+
+```shell
+npm i pg-helper
+```
 
 ## Pools & Sessions<a id="sec-1-2"></a>
 
@@ -300,3 +308,5 @@ If possible, include a small reproducible example e.g. simple script which exhib
 Please note that I am not a windows user and have not used that platform in any meaningful way since around 1997. While I am happy to try and run up a Windows virtual for testing purposes, I have little experience on that platform. However, I am happy to work with anyone experiencing issues on Windows to try and resolve any issues.
 
 ## Version History<a id="sec-1-5"></a>
+
+-   Version 1.0.0 <span class="timestamp-wrapper"><span class="timestamp">[2021-02-15 Mon]</span></span> Initial version.

@@ -31,7 +31,15 @@
   additional information on things like the structure of result sets returned
   from queries etc.
 
+   The current version is v1.0.0. It has been tested against PostgrSQL v12 using node v12.20.0.
+
 ** Installation
+
+   To install the module, just do
+
+   #+begin_src shell
+     npm i pg-helper
+   #+end_src
 
 ** Pools & Sessions
 
@@ -406,3 +414,6 @@
   Windows to try and resolve any issues.
 
 ** Version History
+
+   - Version 1.0.0 [2021-02-15]
+     Initial version.
