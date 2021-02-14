@@ -6,7 +6,7 @@ require("dotenv").config({ path: dotenvPath });
 const chai = require("chai");
 const expect = chai.expect;
 const chaiAsPromised = require("chai-as-promised");
-const PgHelper = require("../src/index");
+const EasyPostgres = require("../src/index");
 
 chai.use(chaiAsPromised);
 
@@ -29,7 +29,7 @@ describe("copyInsert tests", function () {
       "(rec_id SERIAL PRIMARY KEY, rec_date DATE, rec_title VARCHAR(20)," +
       "rec_cost NUMERIC(10,2), rec_order INTEGER)";
 
-    db = new PgHelper();
+    db = new EasyPostgres();
     await db.execSQL(create);
   });
 

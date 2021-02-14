@@ -1,4 +1,4 @@
-- [PgHelper](#sec-1)
+- [EasyPostgres](#sec-1)
   - [Installation](#sec-1-1)
   - [Pools & Sessions](#sec-1-2)
   - [Class Methods](#sec-1-3)
@@ -6,7 +6,7 @@
   - [Version History](#sec-1-5)
 
 
-# PgHelper<a id="sec-1"></a>
+# EasyPostgres<a id="sec-1"></a>
 
 A very simple abstraction over the `pg` and `pg-copy-streams` libraries to simplify working with a PostgreSQL database. Features include
 
@@ -24,14 +24,14 @@ The library is by no means complete. It currently meets all my own use cases, bu
 
 This module is really just a wrapper around the `pg` and `pg-copy-streams` modules from NPM. Therefore, refer to the documentation for these modules for additional information on things like the structure of result sets returned from queries etc.
 
-The current version is v1.0.0. It has been tested against PostgrSQL v12 using node v12.20.0.
+The current version is v2.0.0. It has been tested against PostgrSQL v12 using node v12.20.0.
 
 ## Installation<a id="sec-1-1"></a>
 
 To install the module, just do
 
 ```shell
-npm i pg-helper
+npm i easy-postgres
 ```
 
 ## Pools & Sessions<a id="sec-1-2"></a>
@@ -65,9 +65,9 @@ Then in your code you could have something like;
 const dotenvPath = __dirname + "/../.env";
 require("dotenv").config({ path: dotenvPath });
 
-const PgHelper = require("pg-helper");
+const EasyPostgres = require("easy-postgres");
 
-const db = new PgHelper();
+const db = new EasyPostgres();
 
 let rslt = db.execSQL("SELECT * FROM my_table");
 ```
@@ -77,7 +77,7 @@ However, if you prefer to not use `dotenv` or environment variables, you can jus
 ```js
 "use strict";
 
-const PgHelper = require("pg-helper");
+const EasyPostgres = require("easy-postgres");
 
 const config = {
   user: "tim",
@@ -87,7 +87,7 @@ const config = {
   port: 5432
 };
 
-const db = new PgHelper(config);
+const db = new EasyPostgres(config);
 
 let rslt = db.execSQL("SELECT * FROM my_table");
 ```
@@ -110,7 +110,7 @@ The `releaseConnection(con)` method is used to release the conneciton `con` back
 
 ### close()<a id="sec-1-3-4"></a>
 
-The `close()` method signals that your finished interacting with the database and want to release the connection pool. You should call this method before existing your script. Once you have called `close()` you cannot use the PgHelper object and should destroy it. If you need to re-connect, you will need to call `new PgHelper()`.
+The `close()` method signals that your finished interacting with the database and want to release the connection pool. You should call this method before existing your script. Once you have called `close()` you cannot use the EasyPostgres object and should destroy it. If you need to re-connect, you will need to call `new EasyPostgres()`.
 
 ### execSQL(stmt, params, con)<a id="sec-1-3-5"></a>
 
@@ -128,9 +128,9 @@ Examples
 const dotenvPath = __dirname + "/../.env";
 require("dotenv").config({ path: dotenvPath });
 
-const PgHelper = require("pg-helper");
+const EasyPostgres = require("easy-postgres");
 
-const db = new PgHelper();
+const db = new EasyPostgres();
 
 const createStmt = "CREATE TABLE my_table ("
       + "rec_id SERIAL PRIMARY KEY, name VARCHAR(20), val INTEGER";
@@ -170,9 +170,9 @@ Example
 const dotenvPath = __dirname + "/../.env";
 require("dotenv").config({ path: dotenvPath });
 
-const PgHelper = require("pg-helper");
+const EasyPostgres = require("easy-postgres");
 
-const db = new PgHelper();
+const db = new EasyPostgres();
 
 const stmt = "UPDATE my_table SET col1 = $1 WHERE col2 = $2";
 const params = [["val1", 20], ["val2", 30], ["val3", 40]];
@@ -216,7 +216,7 @@ Example
 const dotenvPath = __dirname + "/../.env";
 require("dotenv").config({ path: dotenvPath });
 
-const PgHelper = require("pg-helper");
+const EasyPostgres = require("easy-postgres");
 
 // Could just use something like moment.js here!
 const dateStr = (d) => {
@@ -267,7 +267,7 @@ const toString = (r) => {
   return `'${dateStr(r.recDate)}'\t'${r.title}'\t${r.cost}\t${r.order}\n`;
 };
 
-const db = new PgHelper();
+const db = new EasyPostgres();
 
 db.copyInsert(stmt, toString, data)
   .then(rslt => {
@@ -295,9 +295,9 @@ Returns an object containing information about the current state of the connecti
 
 ## Bug Reports & Issues<a id="sec-1-4"></a>
 
-Please report bugs via the issues page on github at <https://github.com/theophilusx/pg-helper> . Please make sure to include the following information in all reports
+Please report bugs via the issues page on github at <https://github.com/theophilusx/easy-postgres> . Please make sure to include the following information in all reports
 
--   pg-helper version
+-   easy-postgres version
 -   Node version
 -   PostgreSQL version
 -   Client platform (Linux, Mac, Windows)

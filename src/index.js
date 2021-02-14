@@ -49,7 +49,7 @@ const doCopyTo = (stmt, stringifyFn, data, con) => {
   });
 };
 
-class PgHelper {
+class EasyPostgres {
   constructor(config) {
     this.poolError = null;
     if (config) {
@@ -291,4 +291,4 @@ class PgHelper {
   }
 }
 
-module.exports = PgHelper;
+module.exports = EasyPostgres;

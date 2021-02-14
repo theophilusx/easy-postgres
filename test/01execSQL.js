@@ -6,7 +6,7 @@ require("dotenv").config({ path: dotenvPath });
 const chai = require("chai");
 const expect = chai.expect;
 const chaiAsPromised = require("chai-as-promised");
-const PgHelper = require("../src/index");
+const EasyPostgres = require("../src/index");
 
 chai.use(chaiAsPromised);
 
@@ -14,7 +14,7 @@ describe("Execute statement tests", function () {
   let db;
 
   before("Setup hook", async function () {
-    db = new PgHelper();
+    db = new EasyPostgres();
   });
 
   after("Cleanup hook", async function () {

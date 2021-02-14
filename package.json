@@ -1,6 +1,6 @@
 {
-  "name": "pg-helper",
-  "version": "1.0.0",
+  "name": "easy-postgres",
+  "version": "2.0.0",
   "description": "Simple abstraction for working with PostgeSQL database",
   "main": "src/index.js",
   "directories": {
@@ -11,18 +11,22 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/theophilusx/pg-helper.git"
+    "url": "git+https://github.com/theophilusx/easy-postgres.git"
   },
   "keywords": [
     "database",
-    "Postgres"
+    "Postgres",
+    "Postgre",
+    "PostgreSQL",
+    "Promises",
+    "Async/await"
   ],
   "author": "Tim Cross",
   "license": "GPL-3.0-or-later",
   "bugs": {
-    "url": "https://github.com/theophilusx/pg-helper/issues"
+    "url": "https://github.com/theophilusx/easy-postgres/issues"
   },
-  "homepage": "https://github.com/theophilusx/pg-helper#readme",
+  "homepage": "https://github.com/theophilusx/easy-postgres#readme",
   "dependencies": {
     "pg": "^8.5.1",
     "pg-copy-streams": "^5.1.1"

@@ -6,7 +6,7 @@ require("dotenv").config({ path: dotenvPath });
 const chai = require("chai");
 const expect = chai.expect;
 const chaiAsPromised = require("chai-as-promised");
-const PgHelper = require("../src/index");
+const EasyPostgres = require("../src/index");
 
 chai.use(chaiAsPromised);
 
@@ -26,7 +26,7 @@ describe("Connection tests", function () {
   });
 
   it("Create pool with credentials", async function () {
-    db = new PgHelper(config);
+    db = new EasyPostgres(config);
     expect(db).to.be.an("object");
     let con = await db.getConnection();
     expect(con).to.be.an("object");
@@ -37,7 +37,7 @@ describe("Connection tests", function () {
   });
 
   it("Create pool with env vars", async function () {
-    db = new PgHelper(config);
+    db = new EasyPostgres(config);
     expect(db).to.be.an("object");
     let con = await db.getConnection();
     expect(con).to.be.an("object");
