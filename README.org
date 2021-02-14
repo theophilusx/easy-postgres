@@ -8,14 +8,23 @@
   - Uses the =pg= connection pool for connections
   - Supports automatic or manual management of connections
   - Supports performing commands as part of the same session (connection).
-    Useful for working with temporary tables
+    Useful for working with temporary tables and transaction blocks
   - Support for transactions and commit/rollback
   - Support for bulk data insert using the =\copy= command
   - Promise/async based interface
 
   The library is by no means complete. It currently meets all my own use cases,
   but there is room for adding more functionality as required. Pull requests are
-  welcome, but please ensure they include =Mocha= based tests.
+  welcome, but please ensure they include =Mocha= based tests. Functionality
+  currently missing from this module includes;
+
+  - No support for =copy from= i.e. using the COPY command to copy data /from/
+    the database. Currently, only =copy to= is supported.
+  - No support for the =pg= /config/ based query form i.e. calling query with a
+    config object. This form enables setting array mode for result sets, adding
+    a name for prepared statement support, providing custom type parsers or
+    setting a custom submit dispatcher. This functionality will likely be added
+    in a future version.
 
   This module is really just a wrapper around the =pg= and =pg-copy-streams=
   modules from NPM. Therefore, refer to the documentation for these modules for
@@ -24,7 +33,26 @@
 
 ** Installation
 
-** Basic Examples
+** Pools & Sessions
+
+   This module uses connection pooling. This can have some implications when
+   working with database transactions that either require all statements are
+   executed within the same session, for example transaction blocks, or where
+   the database state changes after the session ends, such as with temporary
+   tables.
+
+   In a connection pool, each connection is a separate session. By default, if
+   you call the methods in this module and do not pass in a connection object,
+   the statement will be executed within its own session. Basically, you don't
+   need to worry about getting a connection and then releasing it when your
+   done. In many situation, this is sufficient. However, if you need to execute
+   multiple statements and you need to ensure they are all executed within the
+   same connection session, you need to manage the connection manually.
+
+   This means first obtaining a connection with =getConnection()= and then
+   passing that object in as the last argument to other method calls. It also
+   means you are responsible for releasing the connection once your done with it
+   via a call to =releaseConnection(con)=.
 
 ** Class Methods
 
@@ -84,6 +112,17 @@
 
       let rslt = db.execSQL("SELECT * FROM my_table");
     #+end_src
+
+    The =config= object also supports a number of optional parameters which can
+    be used to tweak the connection pool settings. The available properties are;
+
+    - connectionTimeoutMillis?: :: Int. Number of milliseconds to wait before
+      timing out when connecting a new client. Default 0 i.e. no timeout
+    - idleTimeoutMillis? :: Int. The number of milliseconds a client must sit
+      idel in the pool before it is disconnected from the backend and discarded.
+      Default 10000 e.g. 10 seconds
+    - max?: :: Int. Maximum number of clients the pool should contain.
+      Default 10.
 
 *** getConnection()
 
@@ -256,6 +295,93 @@
       command.
     - data :: Array. An array of data records to be inserted into the database
     - con :: Object. A connection object as returned from a call to =getConnection()=.
+
+    Example
+
+    #+begin_src js
+      "use strict";
+
+      const dotenvPath = __dirname + "/../.env";
+      require("dotenv").config({ path: dotenvPath });
+
+      const PgHelper = require("pg-helper");
+
+      // Could just use something like moment.js here!
+      const dateStr = (d) => {
+        const year = d.getFullYear();
+        const month = d.getMonth() + 1;
+        const day = d.getDate();
+
+        return `${year}-${month < 10 ? `0${month}` : month}-${
+          day < 10 ? `0${day}` : day
+        }`;
+      };
+
+      // SQL statement to execute to do insert using COPY
+      const stmt =
+          "COPY my_table " +
+          "(rec_date, rec_title, rec_cost, rec_order) " +
+          "FROM STDIN DELIMITER '\t' CSV QUOTE ''''";
+
+      // Some data to insert
+      const data = [
+        {
+          recDate: new Date(),
+          title: "First Record",
+          cost: 2.5,
+          order: 1,
+        },
+        {
+          recDate: new Date("2021-01-01"),
+          title: "Second Record",
+          cost: 4.5,
+          order: 2,
+        },
+        {
+          recDate: new Date("2021-01-15"),
+          title: "Third Record",
+          cost: 6.75,
+          order: 3,
+        },
+        {
+          recDate: new Date("2021-02-10"),
+          title: "Forth Record",
+          cost: 10.5,
+          order: 4,
+        },
+      ];
+
+      const toString = (r) => {
+        return `'${dateStr(r.recDate)}'\t'${r.title}'\t${r.cost}\t${r.order}\n`;
+      };
+
+      const db = new PgHelper();
+
+      db.copyInsert(stmt, toString, data)
+        .then(rslt => {
+          console.log(`${rslt.rowCount} rows inserted`);
+          return db.query("SELECT * FROM my_table");
+        })
+        .then(rslt => {
+          for (let r of rslt.rows) {
+            console.log(`ID: ${r.rec_id} Date: ${r.rec_date} Title: ${r.rec_title}`);
+          }
+          return db.close();
+        })
+        .catch(err => {
+          console.error(err.message);
+        });
+    #+end_src
+
+*** poolStatus()
+
+    Returns an object containing information about the current state of the
+    connection pool. The object properties are;
+
+    - clientCount: :: The current number of clients connected to the backend
+      database
+    - idleCount: :: The number of connections currently idel
+    - waitingCount: :: The number of connection requests waiting to be satisfied
 
 ** Bug Reports & Issues
 
