@@ -1,6 +1,5 @@
-import pg from 'pg';
+import { Pool } from 'pg';
 import type { PoolClient } from 'pg';
-const { Pool } = pg;
 import { Config, PoolStatus } from './types.js';
 import { ConnectionError } from './errors.js';
 
