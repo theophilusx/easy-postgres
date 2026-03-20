@@ -22,7 +22,7 @@
     "db:stop": "podman stop easy-postgres-test && podman rm easy-postgres-test",
     "db:wait": "until podman healthcheck run easy-postgres-test; do sleep 1; done",
     "pretest": "npm run db:clean && npm run db:start && npm run db:wait",
-    "test": "NODE_OPTIONS='--env-file=.env' mocha; EXIT=$?; npm run db:stop; exit $EXIT"
+    "test": "node --env-file=.env node_modules/.bin/mocha; EXIT=$?; npm run db:stop; exit $EXIT"
   },
   "repository": {
     "type": "git",

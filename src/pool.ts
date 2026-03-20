@@ -1,10 +1,11 @@
-import { Pool } from 'pg';
-import type { PoolClient } from 'pg';
+import pg from 'pg';
+import type { Pool as PgPool, PoolClient } from 'pg';
+const { Pool } = pg;
 import { Config, PoolStatus } from './types.js';
 import { ConnectionError } from './errors.js';
 
 export class PoolManager {
-  private pool: Pool;
+  private pool: PgPool;
   private poolError: Error | null = null;
 
   constructor(config?: Config) {
