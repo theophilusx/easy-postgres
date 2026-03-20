@@ -70,8 +70,6 @@ export class PoolManager {
         `close failed: ${(err as Error).message}`,
         err
       );
-    } finally {
-      this.poolError = null;
     }
   }
 
