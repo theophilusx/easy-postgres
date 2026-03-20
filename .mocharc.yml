@@ -1,0 +1,3 @@
+spec: test/**/*.ts
+import: tsx/esm
+timeout: 10000

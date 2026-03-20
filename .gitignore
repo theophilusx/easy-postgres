@@ -106,3 +106,4 @@ dist
 # dotenv data
 .env
 .worktrees/
+dist/
