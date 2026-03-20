@@ -53,11 +53,55 @@ export async function copyInsert<T>(
   }
 }
 
-// copyFrom will be added in Task 7
 export async function copyFrom(
-  _pm: PoolManager,
-  _stmt: string,
-  _con?: PoolClient
+  pm: PoolManager,
+  stmt: string,
+  con?: PoolClient
 ): Promise<Readable> {
-  throw new Error('copyFrom not yet implemented');
+  const doRelease = !con;
+  let client = con;
+  try {
+    if (!client) {
+      client = await pm.getConnection();
+    }
+    const c = client;
+
+    // pg-copy-streams.to() returns a Transform (extends Readable + Writable).
+    // We proxy it through a plain Readable so consumers get a clean Readable interface
+    // and errors are wrapped as CopyError.
+    const pgStream = c.query(pgCopyStreams.to(stmt));
+    const output = new Readable({ read() {} });
+
+    pgStream.on('data', (chunk: Buffer) => {
+      if (!output.push(chunk)) {
+        pgStream.pause();
+      }
+    });
+    output.on('resume', () => pgStream.resume());
+    pgStream.on('end', () => output.push(null));
+    pgStream.on('error', (err: Error) => {
+      // Wrap pg errors as CopyError and destroy the output stream.
+      // destroy(err) causes the stream to emit 'error' then 'close'.
+      output.destroy(new CopyError(`copyFrom stream error: ${err.message}`, err));
+    });
+
+    // Release the connection when the output stream closes.
+    // 'close' fires after 'end', after 'error', and after destroy() with no error —
+    // it is the only event guaranteed in all termination paths.
+    if (doRelease) {
+      output.on('close', () => {
+        pm.releaseConnection(c).catch(() => {
+          // swallow: nothing useful to do with a release error after stream close
+        });
+        if (!pgStream.destroyed) pgStream.destroy();
+      });
+    }
+
+    return output;
+  } catch (err) {
+    if (doRelease && client) {
+      await pm.releaseConnection(client).catch(() => {});
+    }
+    throw new CopyError(`copyFrom setup failed: ${(err as Error).message}`, err);
+  }
 }
