@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg';
 import { PoolManager } from './pool.js';
 import type { Config, QueryResult, CopyResult, PoolStatus } from './types.js';
 import { execSQL as _execSQL, execTransactionSQL as _execTransactionSQL } from './query.js';
+import { copyInsert as _copyInsert, copyFrom as _copyFrom } from './copy.js';
 
 export { EasyPostgresError, ConnectionError, QueryError, TransactionError, CopyError } from './errors.js';
 export type { Config, QueryResult, CopyResult, PoolStatus } from './types.js';
@@ -39,12 +40,17 @@ export class EasyPostgres {
     return _execTransactionSQL<T>(this.pm, stmt, params, con);
   }
 
-  copyInsert<T>(_stmt: string, _fn: (r: T) => string, _data: T[], _con?: PoolClient): Promise<CopyResult> {
-    throw new Error('not yet implemented');
+  copyInsert<T>(
+    stmt: string,
+    stringifyFn: (record: T) => string,
+    data: T[],
+    con?: PoolClient
+  ): Promise<CopyResult> {
+    return _copyInsert<T>(this.pm, stmt, stringifyFn, data, con);
   }
 
-  copyFrom(_stmt: string, _con?: PoolClient): Promise<Readable> {
-    throw new Error('not yet implemented');
+  copyFrom(stmt: string, con?: PoolClient): Promise<Readable> {
+    return _copyFrom(this.pm, stmt, con);
   }
 }
 
