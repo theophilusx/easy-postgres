@@ -1,312 +1,380 @@
-- [EasyPostgres](#sec-1)
-  - [Installation](#sec-1-1)
-  - [Pools & Sessions](#sec-1-2)
-  - [Class Methods](#sec-1-3)
-  - [Bug Reports & Issues](#sec-1-4)
-  - [Version History](#sec-1-5)
+# easy-postgres
 
+Thin async wrapper around [`pg`](https://node-postgres.com/) and [`pg-copy-streams`](https://github.com/brianc/node-pg-copy-streams). ESM-only, ships TypeScript declarations (`.d.ts`), manages a connection pool internally, exposes typed error classes, and provides a Promise/async API throughout.
 
-# EasyPostgres<a id="sec-1"></a>
+## Requirements
 
-A very simple abstraction over the `pg` and `pg-copy-streams` libraries to simplify working with a PostgreSQL database. Features include
+- Node 22+ (uses native `--env-file` — no dotenv needed)
+- PostgreSQL (tested against v17)
+- ESM-only — consumers must use `"type": "module"` in `package.json` or use `.mjs` imports
 
--   Uses the `pg` connection pool for connections
--   Supports automatic or manual management of connections
--   Supports performing commands as part of the same session (connection). Useful for working with temporary tables and transaction blocks
--   Support for transactions and commit/rollback
--   Support for bulk data insert using the `\copy` command
--   Promise/async based interface
+## Installation
 
-The library is by no means complete. It currently meets all my own use cases, but there is room for adding more functionality as required. Pull requests are welcome, but please ensure they include `Mocha` based tests. Functionality currently missing from this module includes;
-
--   No support for `copy from` i.e. using the COPY command to copy data *from* the database. Currently, only `copy to` is supported.
--   No support for the `pg` *config* based query form i.e. calling query with a config object. This form enables setting array mode for result sets, adding a name for prepared statement support, providing custom type parsers or setting a custom submit dispatcher. This functionality will likely be added in a future version.
-
-This module is really just a wrapper around the `pg` and `pg-copy-streams` modules from NPM. Therefore, refer to the documentation for these modules for additional information on things like the structure of result sets returned from queries etc.
-
-The current version is v2.0.0. It has been tested against PostgrSQL v12 using node v12.20.0.
-
-## Installation<a id="sec-1-1"></a>
-
-To install the module, just do
-
-```shell
+```sh
 npm i easy-postgres
 ```
 
-## Pools & Sessions<a id="sec-1-2"></a>
+## Configuration
 
-This module uses connection pooling. This can have some implications when working with database transactions that either require all statements are executed within the same session, for example transaction blocks, or where the database state changes after the session ends, such as with temporary tables.
+### Environment variables
 
-In a connection pool, each connection is a separate session. By default, if you call the methods in this module and do not pass in a connection object, the statement will be executed within its own session. Basically, you don't need to worry about getting a connection and then releasing it when your done. In many situation, this is sufficient. However, if you need to execute multiple statements and you need to ensure they are all executed within the same connection session, you need to manage the connection manually.
+Create a `.env` file with the standard libpq connection variables:
 
-This means first obtaining a connection with `getConnection()` and then passing that object in as the last argument to other method calls. It also means you are responsible for releasing the connection once your done with it via a call to `releaseConnection(con)`.
-
-## Class Methods<a id="sec-1-3"></a>
-
-### Constructor<a id="sec-1-3-1"></a>
-
-The class constructor can be called with or without a `config` object containing properties representing the connection parameters for the database. The properties have the same names as the environment variables used by `libpq`. If no config object is passed in, the `pg` library will look for the necessary environment variables in the process execution environment. If you use the `dotenv` NPM module, you can create a .env file containing the necessary parameters and avoid the need to pass in a config object or you can just set the variables manually. For example, you could have a `.env` file with the following entries;
-
-```conf
-PGUSER=tim
-PGPASSWORD='secret'
-PGHOST=db.example.com
-PGDATABASE=appdb
+```env
+PGUSER=myuser
+PGPASSWORD=mypassword
+PGHOST=localhost
+PGDATABASE=mydb
 PGPORT=5432
-PGAPPNAME='cool-app'
 ```
 
-Then in your code you could have something like;
+Load it with Node's built-in env-file support (Node 22+):
 
-```js
-"use strict";
-
-const dotenvPath = __dirname + "/../.env";
-require("dotenv").config({ path: dotenvPath });
-
-const EasyPostgres = require("easy-postgres");
-
-const db = new EasyPostgres();
-
-let rslt = db.execSQL("SELECT * FROM my_table");
+```sh
+node --env-file=.env yourscript.js
 ```
 
-However, if you prefer to not use `dotenv` or environment variables, you can just pass in the `config` object e.g.
+Constructing `new EasyPostgres()` with no arguments reads connection details from the environment.
 
-```js
-"use strict";
+### Config object
 
-const EasyPostgres = require("easy-postgres");
+Pass a `Config` object to the constructor to set connection details programmatically:
 
-const config = {
-  user: "tim",
-  password: "secret",
-  host: "db.example.com",
-  database: "appdb",
-  port: 5432
-};
-
-const db = new EasyPostgres(config);
-
-let rslt = db.execSQL("SELECT * FROM my_table");
+```typescript
+interface Config {
+  user?: string;
+  password?: string;
+  host?: string;
+  database?: string;
+  port?: number;
+  appname?: string;             // maps to application_name
+  connectionTimeoutMillis?: number;
+  idleTimeoutMillis?: number;
+  max?: number;
+}
 ```
 
-The `config` object also supports a number of optional parameters which can be used to tweak the connection pool settings. The available properties are;
+```typescript
+import EasyPostgres from 'easy-postgres';
 
--   **connectionTimeoutMillis?::** Int. Number of milliseconds to wait before timing out when connecting a new client. Default 0 i.e. no timeout
--   **idleTimeoutMillis?:** Int. The number of milliseconds a client must sit idel in the pool before it is disconnected from the backend and discarded. Default 10000 e.g. 10 seconds
--   **max?::** Int. Maximum number of clients the pool should contain. Default 10.
+const db = new EasyPostgres({
+  host: 'localhost',
+  database: 'mydb',
+  user: 'myuser',
+  password: 'mypassword',
+  port: 5432,
+  max: 10,
+});
+```
 
-### getConnection()<a id="sec-1-3-2"></a>
+## Quick Start
 
-The `getconnection()` method returns a database connection from the connection pool. This can be useful if you want to manage the connection manually, which is sometimes necessary if you want to ensure all SQL runs within the same connection session (for example, when working with temporary tables). The other methods which execute SQL statements take an optional connection as the last argument. When no conneciton is passed in for these methods, the method will request one from the conneciton pool and release it after executing the SQL statement. When you pass in a connection, you are responsible for releasing that connection when you are finished with it.
+```typescript
+import EasyPostgres from 'easy-postgres';               // default export
+import { EasyPostgres } from 'easy-postgres';            // also valid — named export
+```
 
-### releaseConnection(con)<a id="sec-1-3-3"></a>
+```typescript
+import EasyPostgres, { QueryError } from 'easy-postgres';
 
-The `releaseConnection(con)` method is used to release the conneciton `con` back to the connection pool. After obtaining a connection with a call to `getConnection()`, you need to release it back to the pool once your finished using it.
+const db = new EasyPostgres(); // reads from environment
 
--   **con:** a conneciton object obtained from a call to getConnection().
+try {
+  const result = await db.execSQL<{ id: number; name: string }>(
+    'SELECT id, name FROM users WHERE active = $1',
+    [true]
+  );
+  console.log(result.rows);
+} catch (err) {
+  if (err instanceof QueryError) {
+    console.error('Query failed:', err.message, 'SQL:', err.sql);
+  }
+} finally {
+  await db.close();
+}
+```
 
-### close()<a id="sec-1-3-4"></a>
+## API Reference
 
-The `close()` method signals that your finished interacting with the database and want to release the connection pool. You should call this method before existing your script. Once you have called `close()` you cannot use the EasyPostgres object and should destroy it. If you need to re-connect, you will need to call `new EasyPostgres()`.
+### Return Types
 
-### execSQL(stmt, params, con)<a id="sec-1-3-5"></a>
+**`QueryResult<T>`**
 
-The `execSQL(stmt, params, con)` method executes the statement defined in the `stmt` argument. The argument is a string. Statements can contain parameter placeholders using `$1, $2, ... $n`. When placeholder arguments are used, the optional `params` argument contains the values for the placeholders as an array of values. The optional `con` argument is a connection object returned from a call to `getConnection()`. If no `con` argument is supplied, the method will request a connection from the connection pool.
+```typescript
+interface QueryResult<T> {
+  rowCount: number;   // rows affected or returned
+  rows: T[];          // result rows (empty for DDL/DML)
+  command: string;    // pg command tag e.g. "SELECT", "INSERT", "UPDATE"
+}
+```
 
--   **stmt:** String. The SQL statement to executes
--   **params:** (Optional) Array. Parameter values to be substituted for $1, $2, &#x2026; $n placeholders in the SQL statement.
--   **con:** (Optional) Object. A connection object returned from a call to `getConnection()`
+**`CopyResult`**
 
-Examples
+```typescript
+interface CopyResult {
+  rowCount: number;   // equals data.length (the input array size) — the COPY protocol does not return a server-confirmed count, rows, or command tag
+}
+```
 
-```js
-"use strict";
+**`PoolStatus`**
 
-const dotenvPath = __dirname + "/../.env";
-require("dotenv").config({ path: dotenvPath });
+```typescript
+interface PoolStatus {
+  clientCount: number;    // total connections currently open
+  idleCount: number;      // connections idle and available
+  waitingCount: number;   // requests queued waiting for a connection
+}
+```
 
-const EasyPostgres = require("easy-postgres");
+---
 
-const db = new EasyPostgres();
+### `execSQL<T>(stmt, params?, con?)`
 
-const createStmt = "CREATE TABLE my_table ("
-      + "rec_id SERIAL PRIMARY KEY, name VARCHAR(20), val INTEGER";
-const insertStmt = "INSERT INTO my_table (name, val) VALUES ($1, $2)";
-const insertParams = ["Some Name", 50];
-const selectStmt = "SELECT * FROM my_table WHERE name = $1";
-const selectpParams = ["Some Name"];
+```typescript
+execSQL<T>(stmt: string, params?: unknown[], con?: PoolClient): Promise<QueryResult<T>>
+```
 
-async function run() {
-  await db.execSQL(createStmt);
-  let rs1 = await db.execSQL(insertStmt, insertParams);
-  console.log(`Inserted ${rs1.rowCount} rows`);
-  let rs2 = await db.execSQL(selectStmt, selectParams);
-  console.log(`Name: ${rs2.rows[0].name} Value: ${rs2.rows[0].val}`);
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `stmt` | `string` | SQL statement |
+| `params` | `unknown[]` | Optional positional parameters (`$1`, `$2`, …) |
+| `con` | `PoolClient` | Optional connection — caller is responsible for releasing it |
+
+Returns `QueryResult<T>`. For DDL statements, `rows` is empty and `rowCount` is 0.
+
+**DDL — create table:**
+
+```typescript
+await db.execSQL(`
+  CREATE TABLE IF NOT EXISTS events (
+    id   SERIAL PRIMARY KEY,
+    name TEXT NOT NULL
+  )
+`);
+```
+
+**DML — insert:**
+
+```typescript
+const result = await db.execSQL(
+  'INSERT INTO events (name) VALUES ($1)',
+  ['user.signup']
+);
+console.log(result.rowCount); // 1
+```
+
+**DQL — select:**
+
+```typescript
+const result = await db.execSQL<{ id: number; name: string }>(
+  'SELECT id, name FROM events WHERE name = $1',
+  ['user.signup']
+);
+console.log(result.rows); // [{ id: 1, name: 'user.signup' }]
+```
+
+---
+
+### `execTransactionSQL<T>(stmt, params?, con?)`
+
+```typescript
+execTransactionSQL<T>(stmt: string, params?: unknown[][], con?: PoolClient): Promise<QueryResult<T>>
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `stmt` | `string` | SQL statement executed once per inner `params` array |
+| `params` | `unknown[][]` | Array of arrays — one per execution |
+| `con` | `PoolClient` | Optional connection — caller is responsible for releasing it |
+
+Runs all executions inside a single `BEGIN`/`COMMIT` block. Returns accumulated `rowCount` and `rows` across all executions. `command` reflects the pg command tag from the **last** execution.
+
+Edge case: an empty `params` array (`[]`) commits immediately and returns `{ rowCount: 0, rows: [], command: '' }` — the empty string `command` is a sentinel for the zero-execution case.
+
+**Batch update:**
+
+```typescript
+const result = await db.execTransactionSQL(
+  'UPDATE events SET name = $1 WHERE id = $2',
+  [
+    ['user.login', 1],
+    ['user.logout', 2],
+    ['user.signup', 3],
+  ]
+);
+console.log(result.rowCount); // 3
+console.log(result.command);  // "UPDATE"
+```
+
+---
+
+### `copyInsert<T>(stmt, stringifyFn, data, con?)`
+
+```typescript
+copyInsert<T>(
+  stmt: string,
+  stringifyFn: (record: T) => string,
+  data: T[],
+  con?: PoolClient
+): Promise<CopyResult>
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `stmt` | `string` | `COPY … FROM STDIN` statement |
+| `stringifyFn` | `(record: T) => string` | Converts each record to a line of COPY input |
+| `data` | `T[]` | Records to insert |
+| `con` | `PoolClient` | Optional connection — caller is responsible for releasing it |
+
+Returns `CopyResult` — only `rowCount` (equals `data.length`). The COPY protocol does not return rows or a command tag.
+
+**Tab-delimited bulk insert:**
+
+```typescript
+interface Event { id: number; name: string }
+
+const result = await db.copyInsert<Event>(
+  'COPY events (id, name) FROM STDIN',
+  (record) => `${record.id}\t${record.name}`,
+  [
+    { id: 10, name: 'page.view' },
+    { id: 11, name: 'page.exit' },
+  ]
+);
+console.log(result.rowCount); // 2
+```
+
+---
+
+### `copyFrom(stmt, con?)`
+
+```typescript
+copyFrom(stmt: string, con?: PoolClient): Promise<Readable>
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `stmt` | `string` | `COPY … TO STDOUT` statement |
+| `con` | `PoolClient` | Optional connection; if omitted, released automatically when the stream closes |
+
+Returns `Promise<Readable>`. There are two distinct error paths:
+
+1. **Setup errors** (e.g. connection failure before the stream is created): `copyFrom` returns a **rejected promise** — wrap the `await copyFrom(…)` call in try/catch.
+2. **Streaming errors** (errors from the underlying pipe after the stream is returned): surfaced as a stream `error` event on the returned `Readable` — attach an `error` listener.
+
+When no `con` is passed, the connection is automatically released when the output stream emits `close`. The `close` event is guaranteed across all termination paths — normal end, streaming error, and explicit destroy — so auto-release covers the error path too.
+
+**Export via pipe:**
+
+```typescript
+import { createWriteStream } from 'node:fs';
+
+let readable: Readable;
+try {
+  readable = await db.copyFrom('COPY events TO STDOUT');
+} catch (err) {
+  // Setup error (CopyError) — stream was never created
+  console.error('Failed to start COPY:', err);
+  process.exit(1);
 }
 
-run();
+readable.on('error', (err) => {
+  // Streaming error after stream was returned
+  console.error('Stream error:', err);
+});
+
+const out = createWriteStream('events.tsv');
+readable.pipe(out);
 ```
 
-### execTransactionSQL(stmt, params, con)<a id="sec-1-3-6"></a>
+---
 
-Similar to `execSQL()`, except the statement is executed inside a transaction block. If all executions of the statement succeed, the block is committed. If there are any errors, the block is rolled back.
+### `getConnection()` / `releaseConnection(con)`
 
-The `stmt` argument is a string specifying an SQL command, usually with placeholder parameters (e.g. $1, $2, &#x2026; $n). The `params` argument is an array of array elements where each sub-array is a list of values to be used as values in the placeholder parameters. The `con` argument is an optional connection object, as returned from a call to `getconnection()`. If no `con` value is supplied, the method will request a new connection from the connection pool and release it back to the pool on completion.
-
-The result set returned by the method is an accumulated result set where the `rowCount` property is the total rows affected by the transaction and the `rows` value is the accumulated rows returned by each statement execution.
-
--   **stmt:** String. The SQL statement to execute, possibly including $1 &#x2026; $n placeholder arguments.
--   **params:** (Optional) Array. An array of arrays where each sub-array contains the values to be used to replace placeholder parameters.
--   **con:** (Optional) Object. A connection object returned from a call to `getConnection`.
-
-Example
-
-```js
-"use strict";
-
-const dotenvPath = __dirname + "/../.env";
-require("dotenv").config({ path: dotenvPath });
-
-const EasyPostgres = require("easy-postgres");
-
-const db = new EasyPostgres();
-
-const stmt = "UPDATE my_table SET col1 = $1 WHERE col2 = $2";
-const params = [["val1", 20], ["val2", 30], ["val3", 40]];
-
-db.execTransactionSQL(stmt, params)
-  .then(rslt => {
-    console.log(`${rslt.rowCount} rows updated`);
-  })
-  .catch(err => {
-    console.log(err.message);
-  });
+```typescript
+getConnection(): Promise<PoolClient>
+releaseConnection(con: PoolClient | null | undefined): Promise<void>
 ```
 
-### copyInsert(stmt, stringifyFn, data, con)<a id="sec-1-3-7"></a>
+Acquire and release a connection manually. Use when multiple statements must share a session (e.g. temp tables, advisory locks).
 
-The `copyInsert(stmt, stringifyFn, data, con)` method uses the Postgres COPY command to insert records into a database table. For large record sets, this can be much faster than using standard SQL INSERT commands. The COPY statement format must comply with Postres COPY command (see Postgres documentation for details) For example
+`releaseConnection` accepts `null | undefined` and is a no-op in those cases — safe to call unconditionally in a `finally` block.
 
-```sql
-COPY my_table (col1, col2, col3, col4)
-FROM STDIN WITH DELIMITER '\t' CSV QUOTE ''''
-```
+> **Warning:** `releaseConnection` can throw `ConnectionError` if the underlying pool operation fails. A throw from a `finally` block will swallow the original error. Wrap `releaseConnection` in its own try/catch inside `finally` if this matters.
 
-The above statement essentially says that the COPY command will expect records in a CSV format where fields are separated by a tab character with single quotes used for fields requiring quoting (like strings or dates). The stringifyFn will accept a record in whatever format you require and convert it into a string with values, like strings, quoted with single quotes and fields separated by a tab. The string should end with a newline character. Some values will need conversion to formats which Postgres will understand e.g. date strings or JSON data etc. This can be a little tricky to work out. Sometimes, it can be useful to write the data to a file in what you think is the correct format and then use psql to try inserting it into the database. This will sometimes provide error messages which are more meaningful and can be easier for experimentation.
+**Manual session — temp table across two statements:**
 
-The `data` argument is an array of records. The records can be in any format e.g. objects, arrays of data etc. All that is necessary is that the `stringifyFn` function is able to understand the format and generate the necessary string representation.
+```typescript
+import { ConnectionError } from 'easy-postgres';
 
-The `con` argument is a connection object returned by a call to `getConnection()`. If it is not supplied, the method will request a new connection from the connection pool and release it once the statement execution has completed.
+let con;
+try {
+  con = await db.getConnection();
 
-The method returns a result set object with only one property, `rowCount`, the number of records inserted by the copy command. Note that the COPY command is an all or nothing command. The command is executed inside a transaction and if any errors occur, all inserts are rolled back.
+  await db.execSQL('CREATE TEMP TABLE tmp_ids (id INT)', [], con);
+  await db.execSQL('INSERT INTO tmp_ids VALUES ($1)', [42], con);
 
--   **stmt:** String. A Postgres COPY statement.
--   **stringifyFn:** Function. A function of one argument which accepts a record and returns a suitable string representation for insertion using the COPY command.
--   **data:** Array. An array of data records to be inserted into the database
--   **con:** Object. A connection object as returned from a call to `getConnection()`.
-
-Example
-
-```js
-"use strict";
-
-const dotenvPath = __dirname + "/../.env";
-require("dotenv").config({ path: dotenvPath });
-
-const EasyPostgres = require("easy-postgres");
-
-// Could just use something like moment.js here!
-const dateStr = (d) => {
-  const year = d.getFullYear();
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-
-  return `${year}-${month < 10 ? `0${month}` : month}-${
-    day < 10 ? `0${day}` : day
-  }`;
-};
-
-// SQL statement to execute to do insert using COPY
-const stmt =
-    "COPY my_table " +
-    "(rec_date, rec_title, rec_cost, rec_order) " +
-    "FROM STDIN DELIMITER '\t' CSV QUOTE ''''";
-
-// Some data to insert
-const data = [
-  {
-    recDate: new Date(),
-    title: "First Record",
-    cost: 2.5,
-    order: 1,
-  },
-  {
-    recDate: new Date("2021-01-01"),
-    title: "Second Record",
-    cost: 4.5,
-    order: 2,
-  },
-  {
-    recDate: new Date("2021-01-15"),
-    title: "Third Record",
-    cost: 6.75,
-    order: 3,
-  },
-  {
-    recDate: new Date("2021-02-10"),
-    title: "Forth Record",
-    cost: 10.5,
-    order: 4,
-  },
-];
-
-const toString = (r) => {
-  return `'${dateStr(r.recDate)}'\t'${r.title}'\t${r.cost}\t${r.order}\n`;
-};
-
-const db = new EasyPostgres();
-
-db.copyInsert(stmt, toString, data)
-  .then(rslt => {
-    console.log(`${rslt.rowCount} rows inserted`);
-    return db.query("SELECT * FROM my_table");
-  })
-  .then(rslt => {
-    for (let r of rslt.rows) {
-      console.log(`ID: ${r.rec_id} Date: ${r.rec_date} Title: ${r.rec_title}`);
+  const result = await db.execSQL<{ id: number }>(
+    'SELECT id FROM tmp_ids',
+    [],
+    con
+  );
+  console.log(result.rows); // [{ id: 42 }]
+} finally {
+  try {
+    await db.releaseConnection(con);
+  } catch (err) {
+    if (err instanceof ConnectionError) {
+      console.error('Release failed:', err);
     }
-    return db.close();
-  })
-  .catch(err => {
-    console.error(err.message);
-  });
+  }
+}
 ```
 
-### poolStatus()<a id="sec-1-3-8"></a>
+---
 
-Returns an object containing information about the current state of the connection pool. The object properties are;
+### `close()` / `poolStatus()`
 
--   **clientCount::** The current number of clients connected to the backend database
--   **idleCount::** The number of connections currently idel
--   **waitingCount::** The number of connection requests waiting to be satisfied
+```typescript
+close(): Promise<void>
+poolStatus(): PoolStatus
+```
 
-## Bug Reports & Issues<a id="sec-1-4"></a>
+- **`close()`** — drains and ends the pool. Throws `ConnectionError` on failure. After calling `close()`, the instance cannot be reused.
+- **`poolStatus()`** — synchronous snapshot of the pool state. Returns `PoolStatus`.
 
-Please report bugs via the issues page on github at <https://github.com/theophilusx/easy-postgres> . Please make sure to include the following information in all reports
+```typescript
+const status = db.poolStatus();
+console.log(status.clientCount, status.idleCount, status.waitingCount);
 
--   easy-postgres version
--   Node version
--   PostgreSQL version
--   Client platform (Linux, Mac, Windows)
--   Database platform
+await db.close();
+```
 
-If possible, include a small reproducible example e.g. simple script which exhibits the issue you are encountering. There is a much higher chance of a quick fix if I am able to reproduce the problem.
+---
 
-Please note that I am not a windows user and have not used that platform in any meaningful way since around 1997. While I am happy to try and run up a Windows virtual for testing purposes, I have little experience on that platform. However, I am happy to work with anyone experiencing issues on Windows to try and resolve any issues.
+## Error Classes
 
-## Version History<a id="sec-1-5"></a>
+All error classes are named exports from `easy-postgres`. `instanceof` checks work correctly across the full hierarchy.
 
--   Version 1.0.0 <span class="timestamp-wrapper"><span class="timestamp">[2021-02-15 Mon]</span></span> Initial version.
+| Class | Extends | Extra Properties | When Thrown |
+|-------|---------|-----------------|-------------|
+| `EasyPostgresError` | `Error` | `cause?: unknown` | Base class — never thrown directly |
+| `ConnectionError` | `EasyPostgresError` | — | Pool/connection failures (`getConnection`, `releaseConnection`, `close`) |
+| `QueryError` | `EasyPostgresError` | `sql: string` | `execSQL` failures |
+| `TransactionError` | `EasyPostgresError` | `sql: string` | `execTransactionSQL` failures |
+| `CopyError` | `EasyPostgresError` | — | `copyInsert` failures; `copyFrom` setup failures; `copyFrom` stream errors |
+
+```typescript
+import {
+  EasyPostgresError,
+  ConnectionError,
+  QueryError,
+  TransactionError,
+  CopyError,
+} from 'easy-postgres';
+```
+
+## Version History
+
+- **v3.0.0** — ESM/TypeScript rewrite; typed errors; `copyFrom`; Node 22+
+- **v2.0.0** — previous CJS version
