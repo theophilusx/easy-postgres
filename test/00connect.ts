@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import EasyPostgres from '../src/index.js';
-import { ConnectionError } from '../src/errors.js';
+import { ConnectionError, EasyPostgresError } from '../src/errors.js';
 
 describe('Connection tests', function () {
   it('creates pool with explicit config and executes query', async function () {
@@ -60,5 +60,38 @@ describe('Connection tests', function () {
     await db.releaseConnection(null);   // must not throw
     await db.releaseConnection(undefined); // must not throw
     await db.close();
+  });
+
+  it('close() makes the instance unusable', async function () {
+    const db = new EasyPostgres();
+    await db.close();
+    try {
+      await db.execSQL('SELECT 1');
+      expect.fail('should have thrown after close');
+    } catch (err) {
+      // execSQL wraps the pool-closed error in QueryError (which extends EasyPostgresError)
+      expect(err).to.be.instanceOf(EasyPostgresError);
+    }
+  });
+
+  it('appname config is forwarded as application_name to PostgreSQL', async function () {
+    const appname = 'easy-postgres-test-app';
+    const db = new EasyPostgres({
+      user: process.env.PGUSER,
+      password: process.env.PGPASSWORD,
+      host: process.env.PGHOST,
+      database: process.env.PGDATABASE,
+      port: Number(process.env.PGPORT ?? '5432'),
+      appname,
+    });
+    try {
+      // pg_stat_activity.application_name reflects the connection's application_name
+      const result = await db.execSQL<{ appname: string }>(
+        "SELECT application_name AS appname FROM pg_stat_activity WHERE pid = pg_backend_pid()"
+      );
+      expect(result.rows[0].appname).to.equal(appname);
+    } finally {
+      await db.close();
+    }
   });
 });

@@ -51,6 +51,7 @@ interface Config {
   connectionTimeoutMillis?: number;
   idleTimeoutMillis?: number;
   max?: number;
+  ssl?: boolean | object;       // e.g. true, or { rejectUnauthorized: false }
 }
 ```
 
@@ -102,9 +103,9 @@ try {
 
 ```typescript
 interface QueryResult<T> {
-  rowCount: number;   // rows affected or returned
-  rows: T[];          // result rows (empty for DDL/DML)
-  command: string;    // pg command tag e.g. "SELECT", "INSERT", "UPDATE"
+  rowCount: number;       // rows affected or returned
+  rows: T[];              // result rows (empty for DDL/DML)
+  command: string | null; // pg command tag e.g. "SELECT", "INSERT", "UPDATE"; null when no execution occurred
 }
 ```
 
@@ -189,7 +190,7 @@ execTransactionSQL<T>(stmt: string, params?: unknown[][], con?: PoolClient): Pro
 
 Runs all executions inside a single `BEGIN`/`COMMIT` block. Returns accumulated `rowCount` and `rows` across all executions. `command` reflects the pg command tag from the **last** execution.
 
-Edge case: an empty `params` array (`[]`) commits immediately and returns `{ rowCount: 0, rows: [], command: '' }` — the empty string `command` is a sentinel for the zero-execution case.
+Edge case: an empty `params` array (`[]`) commits immediately and returns `{ rowCount: 0, rows: [], command: null }` — `null` indicates no statement was executed.
 
 **Batch update:**
 
@@ -204,6 +205,44 @@ const result = await db.execTransactionSQL(
 );
 console.log(result.rowCount); // 3
 console.log(result.command);  // "UPDATE"
+```
+
+---
+
+### `execTransaction<T>(callback, con?)`
+
+```typescript
+execTransaction<T>(callback: (con: PoolClient) => Promise<T>, con?: PoolClient): Promise<T>
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `callback` | `(con: PoolClient) => Promise<T>` | Async function receiving the transaction connection |
+| `con` | `PoolClient` | Optional connection — caller is responsible for releasing it |
+
+Runs `callback` inside a single `BEGIN`/`COMMIT` block. The connection is passed into `callback` so all statements in the callback share the same transaction. On any error, the transaction is rolled back and the original error is rethrown unchanged.
+
+Returns whatever `callback` returns.
+
+Use this when a transaction needs **multiple different SQL statements** (different statements, or a mix of reads and writes). Use `execTransactionSQL` when you need to execute the **same statement with many different parameter sets**.
+
+**Multi-statement transaction:**
+
+```typescript
+const order = await db.execTransaction(async (con) => {
+  const { rows: [order] } = await db.execSQL<{ id: number }>(
+    'INSERT INTO orders (user_id) VALUES ($1) RETURNING id',
+    [userId],
+    con
+  );
+  await db.execSQL(
+    'INSERT INTO order_items (order_id, product_id, qty) VALUES ($1, $2, $3)',
+    [order.id, productId, qty],
+    con
+  );
+  return order;
+});
+console.log(order.id);
 ```
 
 ---
@@ -227,6 +266,8 @@ copyInsert<T>(
 | `con` | `PoolClient` | Optional connection — caller is responsible for releasing it |
 
 Returns `CopyResult` — only `rowCount` (equals `data.length`). The COPY protocol does not return rows or a command tag.
+
+> **Security:** The `stmt` string is sent verbatim to PostgreSQL — it is not parameterized. Never construct `stmt` from untrusted input (e.g. user-supplied table names). Hardcode the statement or validate all dynamic parts before calling `copyInsert`.
 
 **Tab-delimited bulk insert:**
 
@@ -362,6 +403,7 @@ All error classes are named exports from `easy-postgres`. `instanceof` checks wo
 | `ConnectionError` | `EasyPostgresError` | — | Pool/connection failures (`getConnection`, `releaseConnection`, `close`) |
 | `QueryError` | `EasyPostgresError` | `sql: string` | `execSQL` failures |
 | `TransactionError` | `EasyPostgresError` | `sql: string` | `execTransactionSQL` failures |
+| *(callback's error)* | — | — | `execTransaction` re-throws whatever the callback throws, unchanged |
 | `CopyError` | `EasyPostgresError` | — | `copyInsert` failures; `copyFrom` setup failures; `copyFrom` stream errors |
 
 ```typescript

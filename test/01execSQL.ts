@@ -112,7 +112,7 @@ describe('Execute statement tests', function () {
       );
       expect(rslt.rowCount).to.equal(0);
       expect(rslt.rows).to.deep.equal([]);
-      expect(rslt.command).to.equal('');
+      expect(rslt.command).to.be.null;
     });
 
     it('rolls back and throws TransactionError on constraint violation', async function () {
@@ -133,6 +133,71 @@ describe('Execute statement tests', function () {
       const after = await db.execSQL<{ c: string }>('SELECT COUNT(*) as c FROM pghelper.test1');
       // Row count unchanged — the transaction was rolled back
       expect(after.rows[0].c).to.equal(before.rows[0].c);
+    });
+
+    it('uses an explicit connection when provided', async function () {
+      const con = await db.getConnection();
+      try {
+        const rslt = await db.execTransactionSQL(
+          'INSERT INTO pghelper.test1 (name, val) VALUES ($1, $2)',
+          [['expl_con', 77]],
+          con
+        );
+        expect(rslt.rowCount).to.equal(1);
+      } finally {
+        await db.releaseConnection(con);
+      }
+    });
+  });
+
+  describe('execTransaction', function () {
+    it('commits a multi-statement callback transaction and returns callback result', async function () {
+      const result = await db.execTransaction<{ name: string; val: number }>(async (con) => {
+        await db.execSQL(
+          'INSERT INTO pghelper.test1 (name, val) VALUES ($1, $2)',
+          ['tx_multi', 42],
+          con
+        );
+        const r = await db.execSQL<{ name: string; val: number }>(
+          'SELECT name, val FROM pghelper.test1 WHERE name = $1',
+          ['tx_multi'],
+          con
+        );
+        return r.rows[0];
+      });
+      expect(result.name).to.equal('tx_multi');
+      expect(result.val).to.equal(42);
+    });
+
+    it('rolls back and rethrows when the callback throws', async function () {
+      try {
+        await db.execTransaction(async (con) => {
+          await db.execSQL(
+            'INSERT INTO pghelper.test1 (name, val) VALUES ($1, $2)',
+            ['rollback', 999],
+            con
+          );
+          throw new Error('intentional rollback');
+        });
+        expect.fail('should have thrown');
+      } catch (err) {
+        expect((err as Error).message).to.equal('intentional rollback');
+      }
+      const after = await db.execSQL<{ c: string }>('SELECT COUNT(*) as c FROM pghelper.test1 WHERE name = $1', ['rollback']);
+      expect(after.rows[0].c).to.equal('0');
+    });
+
+    it('uses an explicit connection when provided', async function () {
+      const con = await db.getConnection();
+      try {
+        const result = await db.execTransaction<number>(async (txCon) => {
+          const r = await db.execSQL<{ val: number }>('SELECT 99 AS val', [], txCon);
+          return r.rows[0].val;
+        }, con);
+        expect(result).to.equal(99);
+      } finally {
+        await db.releaseConnection(con);
+      }
     });
   });
 });

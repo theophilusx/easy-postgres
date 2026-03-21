@@ -2,7 +2,7 @@ import { Readable } from 'node:stream';
 import type { PoolClient } from 'pg';
 import { PoolManager } from './pool.js';
 import type { Config, QueryResult, CopyResult, PoolStatus } from './types.js';
-import { execSQL as _execSQL, execTransactionSQL as _execTransactionSQL } from './query.js';
+import { execSQL as _execSQL, execTransactionSQL as _execTransactionSQL, execTransaction as _execTransaction } from './query.js';
 import { copyInsert as _copyInsert, copyFrom as _copyFrom } from './copy.js';
 
 export { EasyPostgresError, ConnectionError, QueryError, TransactionError, CopyError } from './errors.js';
@@ -10,7 +10,7 @@ export type { Config, QueryResult, CopyResult, PoolStatus } from './types.js';
 export type { PoolClient } from 'pg';
 
 export class EasyPostgres {
-  protected pm: PoolManager;
+  private pm: PoolManager;
 
   constructor(config?: Config) {
     this.pm = new PoolManager(config);
@@ -47,6 +47,10 @@ export class EasyPostgres {
     con?: PoolClient
   ): Promise<CopyResult> {
     return _copyInsert<T>(this.pm, stmt, stringifyFn, data, con);
+  }
+
+  execTransaction<T>(callback: (con: PoolClient) => Promise<T>, con?: PoolClient): Promise<T> {
+    return _execTransaction<T>(this.pm, callback, con);
   }
 
   copyFrom(stmt: string, con?: PoolClient): Promise<Readable> {

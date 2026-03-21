@@ -62,6 +62,25 @@ describe('copyInsert tests', function () {
     expect(rslt.rowCount).to.equal(0);
   });
 
+  it('uses an explicit connection when provided', async function () {
+    const stmt =
+      "COPY pghelper.insert_tst (rec_date, rec_title, rec_cost, rec_order) " +
+      "FROM STDIN DELIMITER '\t' CSV QUOTE ''''";
+    const con = await db.getConnection();
+    try {
+      const rslt = await db.copyInsert(
+        stmt,
+        (r: { date: string; title: string; cost: number; order: number }) =>
+          `'${r.date}'\t'${r.title}'\t${r.cost}\t${r.order}\n`,
+        [{ date: '2021-03-01', title: 'Expl Con', cost: 1.0, order: 99 }],
+        con
+      );
+      expect(rslt.rowCount).to.equal(1);
+    } finally {
+      await db.releaseConnection(con);
+    }
+  });
+
   it('throws CopyError on invalid COPY statement', async function () {
     try {
       await db.copyInsert('THIS IS NOT A COPY STATEMENT', (r) => String(r), ['x']);

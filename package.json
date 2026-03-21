@@ -17,6 +17,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "prepublishOnly": "npm run build",
     "db:clean": "podman stop easy-postgres-test 2>/dev/null || true; podman rm easy-postgres-test 2>/dev/null || true",
     "db:start": "podman run -d --name easy-postgres-test -e POSTGRES_USER=tim -e POSTGRES_PASSWORD=testpassword -e POSTGRES_DB=playground -p 5435:5432 --health-cmd 'pg_isready -U tim' --health-interval 2s --health-start-period 10s docker.io/postgres:17",
     "db:stop": "podman stop easy-postgres-test && podman rm easy-postgres-test",

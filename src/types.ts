@@ -9,6 +9,8 @@ export interface Config {
   connectionTimeoutMillis?: number;
   idleTimeoutMillis?: number;
   max?: number;
+  /** TLS/SSL config. Pass `true` to require SSL, or an object for fine-grained control (e.g. `{ rejectUnauthorized: false }`). */
+  ssl?: boolean | object;
 }
 
 export interface QueryResult<T = Record<string, unknown>> {
@@ -16,8 +18,8 @@ export interface QueryResult<T = Record<string, unknown>> {
   rowCount: number;
   /** Concatenation of all result rows for multi-execution methods. */
   rows: T[];
-  /** pg command string from the last execution. */
-  command: string;
+  /** pg command string from the last execution; null when no execution occurred (empty params). */
+  command: string | null;
 }
 
 /**

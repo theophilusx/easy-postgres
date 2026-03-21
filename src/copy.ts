@@ -45,7 +45,7 @@ export async function copyInsert<T>(
     return result;
   } catch (err) {
     if (err instanceof CopyError) throw err;
-    throw new CopyError(`copyInsert failed: ${(err as Error).message}`, err);
+    throw new CopyError(`copyInsert failed: ${err instanceof Error ? err.message : String(err)}`, err);
   } finally {
     if (doRelease && client) {
       await pm.releaseConnection(client);
@@ -102,6 +102,6 @@ export async function copyFrom(
     if (doRelease && client) {
       await pm.releaseConnection(client).catch(() => {});
     }
-    throw new CopyError(`copyFrom setup failed: ${(err as Error).message}`, err);
+    throw new CopyError(`copyFrom setup failed: ${err instanceof Error ? err.message : String(err)}`, err);
   }
 }

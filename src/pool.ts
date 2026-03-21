@@ -34,7 +34,7 @@ export class PoolManager {
       return client;
     } catch (err) {
       throw new ConnectionError(
-        `getConnection failed: ${(err as Error).message}`,
+        `getConnection failed: ${err instanceof Error ? err.message : String(err)}`,
         err
       );
     }
@@ -51,7 +51,7 @@ export class PoolManager {
       }
     } catch (err) {
       throw new ConnectionError(
-        `releaseConnection failed: ${(err as Error).message}`,
+        `releaseConnection failed: ${err instanceof Error ? err.message : String(err)}`,
         err
       );
     }
@@ -67,7 +67,7 @@ export class PoolManager {
       }
     } catch (err) {
       throw new ConnectionError(
-        `close failed: ${(err as Error).message}`,
+        `close failed: ${err instanceof Error ? err.message : String(err)}`,
         err
       );
     }
